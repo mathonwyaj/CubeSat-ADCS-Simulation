@@ -1,0 +1,30 @@
+# MATLAB and Simulink generated files
+*.asv
+*.autosave
+*.m~
+*.slxc
+*.mex*
+slprj/
+sccprj/
+codegen/
+simulink_cache.xml
+
+# CMake and Visual Studio build outputs
+build/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+CTestTestfile.cmake
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.sln
+*.exe
+*.obj
+
+# Temporary and operating-system files
+*.tmp
+*.log
+.DS_Store
+Thumbs.db
+desktop.ini
