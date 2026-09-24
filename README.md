@@ -199,7 +199,7 @@ run_estimated_state_monte_carlo
 ## Project Structure
 
 ```text
-CubeSat_Project/
+CubeSat-ADCS-Simulation/
 |-- attitude_control/   MATLAB ADCS, estimator, actuator, disturbance,
 |                       Monte Carlo, and Simulink-generation files
 |-- orbital_dynamics/   Original two-body orbit files
