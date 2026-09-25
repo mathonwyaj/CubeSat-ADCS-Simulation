@@ -23,11 +23,19 @@ add_executable(test_reaction_wheel_actuator
     reaction_wheel_actuator.c
 )
 
+# Integrated quaternion-controller and wheel-actuator test
+add_executable(test_adcs_command_chain
+    test_adcs_command_chain.c
+    quaternion_controller.c
+    reaction_wheel_actuator.c
+)
+
 # GCC and Clang require the mathematics library.
 # Microsoft Visual C provides these functions directly.
 if(NOT MSVC)
     target_link_libraries(test_controller m)
     target_link_libraries(test_quaternion_controller m)
+    target_link_libraries(test_reaction_wheel_actuator m)
     target_link_libraries(test_adcs_command_chain m)
 endif()
 enable_testing()
@@ -45,13 +53,6 @@ add_test(
 add_test(
     NAME reaction_wheel_actuator_test
     COMMAND test_reaction_wheel_actuator
-)
-
-# Integrated quaternion-controller and wheel-actuator test
-add_executable(test_adcs_command_chain
-    test_adcs_command_chain.c
-    quaternion_controller.c
-    reaction_wheel_actuator.c
 )
 
 add_test(

@@ -1,35 +1,80 @@
-# CubeSat Attitude Determination, Control, and Orbital Dynamics
+# CubeSat Attitude Determination, Control and Orbital Dynamics
 
-## Overview
+![MATLAB](https://img.shields.io/badge/MATLAB-R2025b-orange)
+![Simulink](https://img.shields.io/badge/Simulink-3--axis%20model-blue)
+![C](https://img.shields.io/badge/C-C99-00599C?logo=c&logoColor=white)
+[![C99 tests](https://github.com/mathonwyaj/CubeSat-ADCS-Simulation/actions/workflows/c-tests.yml/badge.svg)](https://github.com/mathonwyaj/CubeSat-ADCS-Simulation/actions/workflows/c-tests.yml)
 
-This project implements and validates a CubeSat attitude-determination and control system (ADCS) together with Low Earth Orbit propagation. It progressed from a single-axis PD baseline to a three-axis quaternion model with reaction wheels, sensor simulation, multiplicative extended Kalman filtering (MEKF), environmental disturbances, momentum dumping, Monte Carlo verification, Simulink integration, and a tested C implementation.
+An end-to-end simulation and verification project for a three-axis CubeSat
+attitude determination and control system (ADCS), coupled with Low Earth Orbit
+dynamics. The project progresses from a single-axis PD baseline to quaternion
+control, reaction-wheel dynamics, sensor simulation, multiplicative extended
+Kalman filtering (MEKF), environmental disturbances, magnetorquer momentum
+dumping, Monte Carlo verification, Simulink integration and a tested C99
+implementation.
 
-The current design includes:
+> This is an engineering simulation and portfolio study. It is not a
+> flight-qualified controller or validated spacecraft design.
 
-- A 4 kg asymmetric 0.1 m x 0.2 m x 0.3 m CubeSat
-- Quaternion rigid-body dynamics and three-axis PD control
-- Three orthogonal reaction wheels
-- Gyroscope and star-tracker models
-- An MEKF estimating attitude and gyro bias
-- Gravity-gradient, aerodynamic, solar-radiation-pressure, and magnetic disturbances
-- Magnetorquer momentum dumping
-- Two-body, J2, and simplified atmospheric-drag orbit models
-- MATLAB, Simulink, and C implementations with automated tests
+## Headline results
 
-## Baseline Single-Axis Model
-
-The original `cubesat_attitude.slx` model is retained as the baseline. It uses `Kp = 0.0067`, `Kd = 0.0107`, a +/-0.002 N m torque limit, and a 30 deg initial error.
-
-| Metric | Result |
+| Verification area | Result |
 |---|---:|
-| Final pointing error | 0.0000 deg |
-| Maximum angular velocity | 12.6173 deg/s |
-| Maximum torque | 0.002000 N m |
-| Settling time within 0.5 deg | 4.016 s |
+| Plant and actuator Monte Carlo | 100/100 successful cases |
+| Estimated-state Monte Carlo | 100/100 successful cases |
+| Worst final control error | 0.017219 deg |
+| Maximum Monte Carlo wheel speed | 4286.160 rpm |
+| Wheel-speed-limit cases | 0 |
+| Combined-disturbance maximum pointing error | 1.287 x 10^-4 deg |
+| Momentum reduction using magnetorquers | 99.931% |
+| Simulink final control error | 0.000174 deg |
+| C99/CTest targets | 4/4 passing |
 
-## Three-Axis Quaternion ADCS
+## System architecture
 
-The asymmetric inertia is:
+```text
+Gyroscope + star tracker
+           |
+           v
+   MEKF attitude and bias estimate
+           |
+           v
+ Quaternion error and PD controller
+           |
+           v
+ Reaction-wheel torque and speed limits
+           |
+           v
+  Rigid-body spacecraft dynamics
+           |
+           +---- Environmental disturbance torques
+           |
+           +---- Magnetorquer momentum unloading
+```
+
+The simulated spacecraft is a 4 kg asymmetric `0.1 x 0.2 x 0.3 m` CubeSat
+with three orthogonal reaction wheels. The environmental model includes
+gravity-gradient, aerodynamic, solar-radiation-pressure and residual-magnetic
+torques. Orbit models include two-body propagation, J2 perturbation and a
+simplified constant-density drag comparison.
+
+## Selected engineering outputs
+
+| Closed-loop attitude response | Estimated-state Monte Carlo |
+|---|---|
+| ![Attitude response](results/attitude_response.png) | ![Estimated-state Monte Carlo](results/estimated_state_monte_carlo.png) |
+
+| Disturbance rejection | Momentum dumping |
+|---|---|
+| ![Combined disturbance rejection](results/combined_disturbance_rejection.png) | ![Momentum dumping](results/momentum_dumping.png) |
+
+| J2 nodal precession | J2 and drag comparison |
+|---|---|
+| ![J2 nodal precession](results/j2_nodal_precession.png) | ![J2 and drag comparison](results/j2_drag_comparison.png) |
+
+## Three-axis quaternion ADCS
+
+The asymmetric spacecraft inertia is:
 
 ```text
 Ixx = 0.0433333 kg m^2
@@ -37,174 +82,149 @@ Iyy = 0.0333333 kg m^2
 Izz = 0.0166667 kg m^2
 ```
 
-Inertia-scaled controller gains are:
+The inertia-scaled controller gains are:
 
 ```text
 Kp = [0.04355, 0.03350, 0.01675]
 Kd = [0.06955, 0.05350, 0.02675]
 ```
 
-For the combined initial attitude `[30, -20, 15] deg`, the tuned asymmetric quaternion model settled within 0.5 deg in 10.010 s with final error approximately zero and maximum quaternion norm error `9.379e-13`.
+For the combined initial attitude `[30, -20, 15] deg`, the tuned quaternion
+model settled within `0.5 deg` in `10.010 s`, with approximately zero final
+error and a maximum quaternion norm error of `9.379e-13`.
 
-## Reaction Wheels
+### Reaction-wheel design
 
-Final actuator design:
-
-```text
-Wheel inertia: 2.0e-5 kg m^2 per axis
-Maximum torque: 0.002 N m per axis
-Maximum speed: 6000 rpm per axis
-Maximum momentum: 0.0126 N m s per axis
-```
-
-The wheel inertia was increased from the preliminary `1.0e-5 kg m^2` design after the asymmetric nominal case reached approximately 6016 rpm. The resized nominal design produced peak speeds of approximately `[3354.5, 1476.5, 1130.1] rpm` with no speed-limit activation.
-
-The actuator model includes torque saturation, speed saturation, equal-and-opposite spacecraft/wheel torque, and loss of authority when a saturated wheel is commanded farther into saturation.
-
-## Sensors and MEKF
-
-```text
-Gyroscope rate: 100 Hz
-Gyroscope noise standard deviation: 0.020 deg/s
-Initial gyro bias: [0.050, -0.030, 0.020] deg/s
-Star-tracker rate: 5 Hz
-Star-tracker noise standard deviation: 0.010 deg
-```
-
-Nominal estimated-state closed-loop results:
-
-- Final control error: 0.0065 deg
-- Final estimation error: 0.0031 deg
-- RMS estimation error: 0.0146 deg
-- Settling time: 9.92 s
-- No wheel-speed-limit activation
-
-## Environmental Disturbances
-
-The model includes gravity-gradient, aerodynamic, solar-radiation-pressure, and residual magnetic-dipole torques. The 600 s combined test produced:
-
-| Metric | Result |
+| Parameter | Value per axis |
 |---|---:|
-| Maximum pointing error | `1.287133e-4 deg` |
-| RMS pointing error | `1.164074e-4 deg` |
-| Maximum gravity-gradient torque | `1.790101e-8 N m` |
-| Maximum aerodynamic torque | `2.552528e-8 N m` |
-| Maximum SRP torque | `2.736000e-9 N m` |
-| Maximum magnetic torque | `2.487239e-8 N m` |
-| Maximum total disturbance | `4.335953e-8 N m` |
+| Wheel inertia | 2.0 x 10^-5 kg m^2 |
+| Maximum torque | 0.002 N m |
+| Maximum speed | 6000 rpm |
+| Maximum momentum | 0.0126 N m s |
 
-The maximum absolute wheel speeds were approximately `[0.000006, 7.125432, 9.024754] rpm`, with no speed-limit activation.
+The actuator model applies torque and speed saturation, equal-and-opposite
+spacecraft/wheel torque and loss of authority when a saturated wheel is
+commanded farther into saturation. Resizing the wheel inertia kept nominal peak
+speeds near `[3354.5, 1476.5, 1130.1] rpm` without limit activation.
 
-## Momentum Dumping
+## Sensors and state estimation
 
-Magnetorquer momentum unloading was tested for two inclined orbits from `[3000, -2000, 1000] rpm`.
+| Sensor property | Model value |
+|---|---:|
+| Gyroscope update rate | 100 Hz |
+| Gyroscope noise standard deviation | 0.020 deg/s |
+| Initial gyro bias | [0.050, -0.030, 0.020] deg/s |
+| Star-tracker update rate | 5 Hz |
+| Star-tracker noise standard deviation | 0.010 deg |
 
-- Final wheel speeds: `[2.110, 0.458, 1.407] rpm`
-- Initial wheel-momentum magnitude: `7.836509e-3 N m s`
-- Final wheel-momentum magnitude: `5.397555e-6 N m s`
-- Momentum reduction: 99.931%
-- Maximum commanded dipole: `[0.168411, 0.200000, 0.114636] A m^2`
-- Dipole limit: `0.2 A m^2` per axis
-- Maximum pointing error: `0 deg`
-- Wheel-speed-limit activations: none
+The MEKF estimates attitude and gyro bias. In the nominal estimated-state
+closed loop, final control error was `0.0065 deg`, final estimation error was
+`0.0031 deg`, RMS estimation error was `0.0146 deg` and settling time was
+`9.92 s`.
 
-The implementation accounts for the restriction that magnetic torque is perpendicular to the instantaneous magnetic field.
+## Environmental disturbances and momentum management
 
-## Orbital Dynamics
+The 600 s combined-disturbance simulation produced a maximum total disturbance
+of `4.336e-8 N m` and maximum pointing error of `1.287e-4 deg`.
 
-The nominal 500 km orbit has a circular speed of approximately 7.617 km/s and period of 94.469 min.
+Magnetorquer momentum unloading was tested from initial wheel speeds of
+`[3000, -2000, 1000] rpm`. Wheel-momentum magnitude fell from
+`7.837e-3 N m s` to `5.398e-6 N m s`, a `99.931%` reduction. The implementation
+respects the physical restriction that magnetic torque is perpendicular to the
+instantaneous geomagnetic field.
+
+## Orbital dynamics
+
+The nominal circular 500 km orbit has a speed of approximately `7.617 km/s`
+and period of `94.469 min`.
 
 ### J2 validation
 
-- Initial J2 acceleration: 0.1396% of central gravity
-- Measured RAAN rate at 51.6 deg inclination: -4.779090 deg/day
-- Theoretical RAAN rate: -4.758999 deg/day
-- Three-day RAAN change: -14.357100 deg
+- Measured RAAN rate at 51.6 deg inclination: `-4.779090 deg/day`
+- Theoretical RAAN rate: `-4.758999 deg/day`
+- Three-day RAAN change: `-14.357100 deg`
 - Two-body RAAN change: approximately zero
 
 ### Simplified drag comparison
 
-For seven days with constant density `1.0e-12 kg/m^3`:
+For seven days at a constant density of `1.0e-12 kg/m^3`:
 
-- J2-plus-drag semi-major-axis change: -293.954 m
-- Drag-relative semi-major-axis difference: -304.886 m
-- Final position difference: 153.719 km
+- J2-plus-drag semi-major-axis change: `-293.954 m`
+- Drag-relative semi-major-axis difference: `-304.886 m`
+- Final position difference: `153.719 km`
 
-This constant-density model is for controlled engineering comparison rather than high-fidelity lifetime prediction.
+The constant-density case is a controlled engineering comparison, not a
+high-fidelity orbital-lifetime prediction.
 
-## Monte Carlo Verification
+## Monte Carlo verification
 
-### Plant and actuator uncertainty
+The first 100-case study varies initial attitude, spacecraft inertia, wheel
+inertia and available torque. The full estimated-state study additionally
+varies gyro bias, gyro noise, bias random walk, star-tracker noise and initial
+estimator error.
 
-One hundred cases varied initial attitude, spacecraft inertia, wheel inertia, and available torque.
+| Metric | Worst result across estimated-state cases |
+|---|---:|
+| Successful cases | 100/100 |
+| Final control error | 0.017219 deg |
+| Final estimation error | 0.013357 deg |
+| RMS estimation error | 0.018918 deg |
+| Settling time | 11.790 s |
+| Wheel speed | 4286.160 rpm |
+| Final gyro-bias error magnitude | 0.004634 deg/s |
 
-- Success rate: 100/100
-- Worst final pointing error: 0.002259 deg
-- Worst settling time: 11.920 s
-- Maximum wheel speed: 4089.797 rpm
-- Speed-limit cases: 0
+## Simulink model
 
-### Full estimated-state closed loop
-
-One hundred cases additionally varied gyro bias, gyro noise, bias random walk, star-tracker noise, and initial estimator error.
-
-- Success rate: 100/100
-- Worst final control error: 0.017219 deg
-- Worst final estimation error: 0.013357 deg
-- Worst RMS estimation error: 0.018918 deg
-- Worst settling time: 11.790 s
-- Maximum wheel speed: 4286.160 rpm
-- Speed-limit cases: 0
-- Worst final gyro-bias error magnitude: 0.004634 deg/s
-
-## Three-Axis Simulink Model
-
-`cubesat_attitude_3axis.slx` preserves the original single-axis model and implements the asymmetric quaternion-controlled spacecraft with reaction wheels.
+`attitude_control/cubesat_attitude_3axis.slx` implements the asymmetric
+quaternion-controlled spacecraft with reaction wheels while preserving the
+original single-axis baseline.
 
 - Final attitude: approximately `[-0.000174, -0.000001, -0.000003] deg`
-- Final control error: 0.000174 deg
-- Settling time: 9.9304 s
-- Maximum torque: 0.002 N m per axis
+- Final control error: `0.000174 deg`
+- Settling time: `9.9304 s`
+- Maximum torque: `0.002 N m` per axis
 - Maximum wheel speeds: `[3345.8, 1470.1, 1124.8] rpm`
-- Maximum quaternion norm error: `8.9427e-11`
+- Maximum quaternion norm error: `8.943e-11`
 
-These results closely match the standalone MATLAB simulation.
+## C99 implementation
 
-## C Implementation
+The portable C implementation covers the single-axis controller, normalized
+quaternion PD control, shortest-rotation sign handling, per-axis saturation,
+reaction-wheel limits and the integrated ADCS command chain.
 
-The C implementation preserves the original single-axis controller and adds a normalized quaternion PD controller, shortest-rotation sign handling, per-axis saturation, reaction-wheel torque and speed limiting, and an integrated command-chain test.
-
-```text
-100% tests passed, 0 tests failed out of 4
-```
-
-Build and test from a Visual Studio Developer PowerShell:
+Build and run all four CTest targets from the repository root:
 
 ```powershell
-cmake -S . -B build
-cmake --build build --config Release
-ctest --test-dir build -C Release --output-on-failure
+cmake -S c_implementation -B c_implementation/build
+cmake --build c_implementation/build --config Release
+ctest --test-dir c_implementation/build -C Release --output-on-failure
 ```
 
-## Key Entry Points
+The same clean CMake/CTest sequence runs automatically on GitHub Actions.
+
+## MATLAB entry points
+
+Start MATLAB in `attitude_control/`, then use:
 
 ```matlab
+run_all_tests
+run_attitude_monte_carlo
+run_estimated_state_monte_carlo
 init_simulink_3axis
 build_simulink_3axis
 simulink_result = sim('cubesat_attitude_3axis');
-run_attitude_monte_carlo
-run_estimated_state_monte_carlo
 ```
 
-## Project Structure
+## Repository structure
 
 ```text
-CubeSat-ADCS-Simulation/
+CubeSat_Project/
 |-- attitude_control/   MATLAB ADCS, estimator, actuator, disturbance,
-|                       Monte Carlo, and Simulink-generation files
-|-- orbital_dynamics/   Original two-body orbit files
-|-- c_implementation/   C controllers, wheel actuator, tests, and CMake
-|-- results/            Saved plots and numerical results
+|                       Monte Carlo and Simulink files
+|-- orbital_dynamics/   Original two-body orbit model
+|-- c_implementation/   C99 controllers, actuator, tests and CMake
+|-- results/            Saved plots and verification evidence
+|-- .github/workflows/  Automated CMake and CTest workflow
 |-- README.md
 ```
 
@@ -216,11 +236,17 @@ CubeSat-ADCS-Simulation/
 - CMake and CTest
 - Microsoft Visual C/C++ Build Tools 2022
 
-## Modelling Limitations
+## Modelling limitations
 
-- Environmental models are simplified engineering models.
+- Environmental models are reduced-order engineering models.
 - Atmospheric density is constant in the current drag comparison.
-- The Earth magnetic field is a centred aligned dipole approximation.
+- The geomagnetic field is a centred, aligned dipole approximation.
 - Sensor models use Gaussian noise and gyro-bias random walk.
-- Flexible-body dynamics, structural vibration, thermal effects, detailed power constraints, and communication delays are outside the current scope.
+- Flexible-body dynamics, structural vibration, thermal effects, detailed
+  power constraints and communication delays are outside the current scope.
 - Hardware-in-the-loop and on-orbit validation have not been performed.
+
+## Author
+
+**Mathonwy Akiwumi-Jones**  
+[GitHub](https://github.com/mathonwyaj) | [LinkedIn](https://www.linkedin.com/in/mathonwy-akiwumi-jones-342910374/)

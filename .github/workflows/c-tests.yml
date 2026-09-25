@@ -1,0 +1,22 @@
+name: C99 tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Configure CMake
+        run: cmake -S c_implementation -B c_implementation/build-ci -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build C implementation
+        run: cmake --build c_implementation/build-ci --config Release
+
+      - name: Run CTest
+        run: ctest --test-dir c_implementation/build-ci -C Release --output-on-failure
